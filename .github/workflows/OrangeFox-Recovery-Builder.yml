@@ -10,8 +10,8 @@ on:
         default: '12.1'
         type: choice
         options:
-        - 12.1
-        - 11.0
+          - 12.1
+          - 11.0
 
       DEVICE_TREE:
         description: 'Custom Recovery Tree'
@@ -39,9 +39,9 @@ on:
         default: 'vendorboot'
         type: choice
         options:
-        - boot
-        - recovery
-        - vendorboot
+          - boot
+          - recovery
+          - vendorboot
 
       LDCHECK:
         description: 'Path of blobs to check'
@@ -56,18 +56,17 @@ on:
 
       RECOVERY_INSTALLER:
         description: 'Include recovery installer zip'
-        type: boolean
         required: true
         default: true
+        type: boolean
 
 
 jobs:
   build:
     name: Build OFRP by ${{ github.actor }}
-
     runs-on: ubuntu-latest
 
-    if: github.event.repository.owner.id == github.event.sender.id
+    if: github.repository_owner == github.actor
 
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -77,410 +76,351 @@ jobs:
 
     steps:
 
-    # ---------------------------------------------------------
-    # CHECKOUT
-    # ---------------------------------------------------------
+      # ---------------------------------------------------------
+      # CHECKOUT
+      # ---------------------------------------------------------
 
-    - name: Checkout
-      uses: actions/checkout@v3
-
-
-    # ---------------------------------------------------------
-    # DISPLAY INPUTS
-    # ---------------------------------------------------------
-
-    - name: Display Inputs
-      run: |
-        echo "::group::User Environment Variables"
-
-        echo "========================================"
-        echo "OrangeFox Build Configuration"
-        echo "========================================"
-
-        echo "Manifest Branch:      ${{ github.event.inputs.MANIFEST_BRANCH }}"
-        echo "Device Tree:          ${{ github.event.inputs.DEVICE_TREE }}"
-        echo "Device Tree Branch:   ${{ github.event.inputs.DEVICE_TREE_BRANCH }}"
-        echo "Device Path:          ${{ github.event.inputs.DEVICE_PATH }}"
-        echo "Device Name:          ${{ github.event.inputs.DEVICE_NAME }}"
-        echo "Build Target:         ${{ github.event.inputs.BUILD_TARGET }}"
-        echo "LDCheck Path:         ${{ github.event.inputs.LDCHECK }}"
-        echo "Recovery TAR:         ${{ github.event.inputs.RECOVERY_TAR }}"
-        echo "Recovery Installer:   ${{ github.event.inputs.RECOVERY_INSTALLER }}"
-
-        echo "========================================"
-
-        echo "::endgroup::"
+      - name: Checkout
+        uses: actions/checkout@v4
 
 
-    # ---------------------------------------------------------
-    # CLEAN-UP
-    # ---------------------------------------------------------
+      # ---------------------------------------------------------
+      # DISPLAY INPUTS
+      # ---------------------------------------------------------
 
-    - name: Clean-up
-      uses: rokibhasansagar/slimhub_actions@main
-
-
-    # ---------------------------------------------------------
-    # SWAP SPACE
-    # ---------------------------------------------------------
-
-    - name: Swap Space
-      uses: pierotofy/set-swap-space@master
-      with:
-        swap-size-gb: 24
-
-
-    # ---------------------------------------------------------
-    # BUILD ENVIRONMENT
-    # ---------------------------------------------------------
-
-    - name: Build Environment
-      run: |
-        set -e
-
-        sudo apt update
-        sudo apt -y upgrade
-
-        git clone https://gitlab.com/OrangeFox/misc/scripts
-
-        cd scripts
-
-        sudo bash setup/android_build_env.sh
+      - name: Display Inputs
+        run: |
+          echo "========================================"
+          echo "OrangeFox Build Configuration"
+          echo "========================================"
+          echo "Manifest Branch:      ${{ inputs.MANIFEST_BRANCH }}"
+          echo "Device Tree:          ${{ inputs.DEVICE_TREE }}"
+          echo "Device Tree Branch:   ${{ inputs.DEVICE_TREE_BRANCH }}"
+          echo "Device Path:          ${{ inputs.DEVICE_PATH }}"
+          echo "Device Name:          ${{ inputs.DEVICE_NAME }}"
+          echo "Build Target:         ${{ inputs.BUILD_TARGET }}"
+          echo "LDCheck Path:         ${{ inputs.LDCHECK }}"
+          echo "Recovery TAR:         ${{ inputs.RECOVERY_TAR }}"
+          echo "Recovery Installer:   ${{ inputs.RECOVERY_INSTALLER }}"
+          echo "========================================"
 
 
-    # ---------------------------------------------------------
-    # SET UP ORANGEFOX MANIFEST
-    # ---------------------------------------------------------
+      # ---------------------------------------------------------
+      # CLEAN-UP
+      # ---------------------------------------------------------
 
-    - name: Set-up Manifest
-      if: github.event.inputs.MANIFEST_BRANCH == '11.0' || github.event.inputs.MANIFEST_BRANCH == '12.1'
-      run: |
-        set -e
+      - name: Clean-up
+        uses: rokibhasansagar/slimhub_actions@main
 
-        echo "========================================"
-        echo "Setting up OrangeFox"
-        echo "========================================"
 
-        FOX_PATH="${GITHUB_WORKSPACE}/OrangeFox/fox_${{ github.event.inputs.MANIFEST_BRANCH }}"
+      # ---------------------------------------------------------
+      # SWAP SPACE
+      # ---------------------------------------------------------
 
-        echo "GITHUB_WORKSPACE:"
-        echo "${GITHUB_WORKSPACE}"
+      - name: Swap Space
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 24
 
-        echo "Manifest branch:"
-        echo "${{ github.event.inputs.MANIFEST_BRANCH }}"
 
-        echo "OrangeFox source path:"
-        echo "${FOX_PATH}"
+      # ---------------------------------------------------------
+      # BUILD ENVIRONMENT
+      # ---------------------------------------------------------
 
-        echo "========================================"
+      - name: Build Environment
+        run: |
+          set -e
 
-        mkdir -p "${GITHUB_WORKSPACE}/OrangeFox"
+          sudo apt update
+          sudo apt -y upgrade
 
-        cd "${GITHUB_WORKSPACE}/OrangeFox"
+          git clone https://gitlab.com/OrangeFox/misc/scripts
 
-        git config --global user.name "Pantelis"
-        git config --global user.email "rimurum@pm.me"
+          cd scripts
 
-        # Clone OrangeFox sync tool
-        if [ ! -d "sync" ]; then
-          echo "Cloning OrangeFox sync repository..."
+          sudo bash setup/android_build_env.sh
 
-          git clone https://gitlab.com/OrangeFox/sync.git
-        else
-          echo "OrangeFox sync repository already exists."
-        fi
 
-        cd sync
+      # ---------------------------------------------------------
+      # SET UP ORANGEFOX MANIFEST
+      # ---------------------------------------------------------
 
-        chmod +x orangefox_sync.sh
+      - name: Set-up Manifest
+        run: |
+          set -e
 
-        echo "========================================"
-        echo "Running OrangeFox sync"
-        echo "========================================"
+          FOX_PATH="${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}"
 
-        ./orangefox_sync.sh \
-          --branch "${{ github.event.inputs.MANIFEST_BRANCH }}" \
-          --path "${FOX_PATH}"
-
-        echo "========================================"
-        echo "Checking OrangeFox source directory"
-        echo "========================================"
-
-        if [ ! -d "${FOX_PATH}" ]; then
+          echo "========================================"
+          echo "Setting up OrangeFox"
+          echo "========================================"
+          echo "GITHUB_WORKSPACE:"
+          echo "${GITHUB_WORKSPACE}"
           echo ""
-          echo "ERROR: OrangeFox source directory was NOT created!"
+          echo "Manifest branch:"
+          echo "${{ inputs.MANIFEST_BRANCH }}"
           echo ""
-          echo "Expected:"
+          echo "OrangeFox path:"
           echo "${FOX_PATH}"
-          echo ""
-          echo "Contents of ${GITHUB_WORKSPACE}/OrangeFox:"
-          ls -lah "${GITHUB_WORKSPACE}/OrangeFox" || true
-          echo ""
-          echo "Searching for possible OrangeFox directories:"
-          find "${GITHUB_WORKSPACE}/OrangeFox" -maxdepth 3 -type d -print || true
-          echo ""
-          exit 1
-        fi
-
-        echo "OrangeFox source found!"
-        echo ""
-
-        echo "Source directory:"
-        ls -lah "${FOX_PATH}"
-
-        echo ""
-        echo "========================================"
-        echo "Manifest setup completed successfully"
-        echo "========================================"
-
-
-    # ---------------------------------------------------------
-    # CLONE DEVICE TREE
-    # ---------------------------------------------------------
-
-    - name: Clone Device Tree
-      run: |
-        set -e
-
-        FOX_PATH="${GITHUB_WORKSPACE}/OrangeFox/fox_${{ github.event.inputs.MANIFEST_BRANCH }}"
-
-        echo "========================================"
-        echo "Checking OrangeFox source"
-        echo "========================================"
-
-        if [ ! -d "${FOX_PATH}" ]; then
-          echo "ERROR: OrangeFox source directory does not exist!"
-          echo "Expected: ${FOX_PATH}"
-          exit 1
-        fi
-
-        cd "${FOX_PATH}"
-
-        echo "Current directory:"
-        pwd
-
-        echo ""
-        echo "Cloning device tree..."
-
-        mkdir -p "$(dirname "${{ github.event.inputs.DEVICE_PATH }}")"
-
-        git clone \
-          "${{ github.event.inputs.DEVICE_TREE }}" \
-          -b "${{ github.event.inputs.DEVICE_TREE_BRANCH }}" \
-          "./${{ github.event.inputs.DEVICE_PATH }}"
-
-        cd "${{ github.event.inputs.DEVICE_PATH }}"
-
-        echo ""
-        echo "Device tree:"
-        pwd
-
-        echo ""
-        echo "Device tree commit:"
-
-        COMMIT_ID=$(git rev-parse HEAD)
-
-        echo "${COMMIT_ID}"
-
-        echo "COMMIT_ID=${COMMIT_ID}" >> "$GITHUB_ENV"
-
-
-    # ---------------------------------------------------------
-    # CHECK MANIFEST BRANCH
-    # ---------------------------------------------------------
-
-    - name: Check Manifest Branch
-      uses: haya14busa/action-cond@v1
-      id: fox_branch
-
-      with:
-
-        cond: ${{ github.event.inputs.MANIFEST_BRANCH == '11.0' || github.event.inputs.MANIFEST_BRANCH == '12.1' }}
-
-        if_true: lunch twrp_${{ github.event.inputs.DEVICE_NAME }}-eng && make clean && mka adbd ${{ github.event.inputs.BUILD_TARGET }}image
-
-        if_false: lunch omni_${{ github.event.inputs.DEVICE_NAME }}-eng && make clean && mka ${{ github.event.inputs.BUILD_TARGET }}image
-
-
-    # ---------------------------------------------------------
-    # BUILD ORANGEFOX
-    # ---------------------------------------------------------
-
-    - name: Building OrangeFox
-      run: |
-        set -e
-
-        FOX_PATH="${GITHUB_WORKSPACE}/OrangeFox/fox_${{ github.event.inputs.MANIFEST_BRANCH }}"
-
-        echo "========================================"
-        echo "Starting OrangeFox build"
-        echo "========================================"
-
-        if [ ! -d "${FOX_PATH}" ]; then
-          echo "ERROR: OrangeFox source directory does not exist!"
-          echo "${FOX_PATH}"
-          exit 1
-        fi
-
-        cd "${FOX_PATH}"
-
-        echo "Build directory:"
-        pwd
-
-        echo ""
-        echo "Loading build environment..."
-
-        set +e
-        source build/envsetup.sh
-        ENV_STATUS=$?
-        set -e
-
-        if [ ${ENV_STATUS} -ne 0 ]; then
-          echo "ERROR: build/envsetup.sh failed!"
-          exit ${ENV_STATUS}
-        fi
-
-        export ALLOW_MISSING_DEPENDENCIES=true
-
-        echo ""
-        echo "Running build command:"
-        echo "${{ steps.fox_branch.outputs.value }}"
-
-        echo ""
-        echo "========================================"
-
-        ${{ steps.fox_branch.outputs.value }}
-
-        echo "========================================"
-        echo "OrangeFox build finished"
-        echo "========================================"
-
-
-    # ---------------------------------------------------------
-    # SET BUILD DATE
-    # ---------------------------------------------------------
-
-    - name: Set Build Date
-      run: |
-        echo "BUILD_DATE=$(date +%Y%m%d)" >> "$GITHUB_ENV"
-
-
-    # ---------------------------------------------------------
-    # CHECK RECOVERY
-    # ---------------------------------------------------------
-
-    - name: Check if Recovery Exist
-      run: |
-        set -e
-
-        FOX_PATH="${GITHUB_WORKSPACE}/OrangeFox/fox_${{ github.event.inputs.MANIFEST_BRANCH }}"
-
-        PRODUCT_PATH="${FOX_PATH}/out/target/product/${{ github.event.inputs.DEVICE_NAME }}"
-
-        echo "========================================"
-        echo "Checking recovery output"
-        echo "========================================"
-
-        echo "Product path:"
-        echo "${PRODUCT_PATH}"
-
-        if [ -f "${PRODUCT_PATH}"/OrangeFox*.img ]; then
-
-          echo "OrangeFox image found!"
-
-          echo "CHECK_IMG_IS_OK=true" >> "$GITHUB_ENV"
-
-          echo "FILE_PATH=${PRODUCT_PATH}" >> "$GITHUB_ENV"
-
-          MD5_IMG=$(md5sum "${PRODUCT_PATH}"/OrangeFox*.img | cut -d ' ' -f 1)
-
-          echo "MD5_IMG=${MD5_IMG}" >> "$GITHUB_ENV"
-
-        elif [ -f "${PRODUCT_PATH}/target/product/${{ github.event.inputs.DEVICE_NAME }}"/OrangeFox*.img ]; then
-
-          echo "OrangeFox image found in nested target directory!"
-
-          NESTED_PATH="${PRODUCT_PATH}/target/product/${{ github.event.inputs.DEVICE_NAME }}"
-
-          echo "CHECK_IMG_IS_OK=true" >> "$GITHUB_ENV"
-
-          echo "FILE_PATH=${NESTED_PATH}" >> "$GITHUB_ENV"
-
-          MD5_IMG=$(md5sum "${NESTED_PATH}"/OrangeFox*.img | cut -d ' ' -f 1)
-
-          echo "MD5_IMG=${MD5_IMG}" >> "$GITHUB_ENV"
-
-        else
-
-          echo "ERROR: Recovery image was not found."
-
-          echo ""
-          echo "Contents of product directory:"
-
-          ls -lah "${PRODUCT_PATH}" || true
-
-          echo ""
-          echo "Searching for OrangeFox images:"
-
-          find "${FOX_PATH}/out" -type f -name "OrangeFox*.img" -print || true
-
-          exit 1
-
-        fi
-
-
-    # ---------------------------------------------------------
-    # RENAME RECOVERY
-    # ---------------------------------------------------------
-
-    - name: Rename the Recovery
-      run: |
-        set -e
-
-        cd "${{ env.FILE_PATH }}"
-
-        echo "Recovery output directory:"
-        pwd
-
-        case "${{ github.event.inputs.BUILD_TARGET }}" in
-
-          boot)
-            mv OrangeFox*.img boot.img
-            echo "RECOVERY_TYPE=boot" >> "$GITHUB_ENV"
-            echo "boot.img file found!"
-            ;;
-
-          recovery)
-            mv OrangeFox*.img recovery.img
-            echo "RECOVERY_TYPE=recovery" >> "$GITHUB_ENV"
-            echo "recovery.img file found!"
-            ;;
-
-          vendorboot)
-            mv OrangeFox*.img vendor_boot.img
-            echo "RECOVERY_TYPE=vendor_boot" >> "$GITHUB_ENV"
-            echo "vendor_boot.img file found!"
-            ;;
-
-          *)
-            echo "No valid recovery target specified."
+          echo "========================================"
+
+          mkdir -p "${GITHUB_WORKSPACE}/OrangeFox"
+
+          cd "${GITHUB_WORKSPACE}/OrangeFox"
+
+          git config --global user.name "Pantelis"
+          git config --global user.email "rimurum@pm.me"
+
+          if [ ! -d "sync" ]; then
+            echo "Cloning OrangeFox sync repository..."
+            git clone https://gitlab.com/OrangeFox/sync.git
+          fi
+
+          cd sync
+
+          chmod +x orangefox_sync.sh
+
+          echo "========================================"
+          echo "Running OrangeFox sync"
+          echo "========================================"
+
+          ./orangefox_sync.sh \
+            --branch "${{ inputs.MANIFEST_BRANCH }}" \
+            --path "${FOX_PATH}"
+
+          echo "========================================"
+          echo "Checking OrangeFox source"
+          echo "========================================"
+
+          if [ ! -d "${FOX_PATH}" ]; then
+            echo "ERROR: OrangeFox source directory was not created!"
+            echo ""
+            echo "Expected:"
+            echo "${FOX_PATH}"
+            echo ""
+            echo "OrangeFox directory contents:"
+            ls -lah "${GITHUB_WORKSPACE}/OrangeFox" || true
+            echo ""
+            echo "Searching for directories:"
+            find "${GITHUB_WORKSPACE}/OrangeFox" -maxdepth 3 -type d -print || true
             exit 1
-            ;;
+          fi
 
-        esac
+          echo "OrangeFox source found!"
+          echo ""
+          echo "Source directory:"
+          ls -lah "${FOX_PATH}"
 
-      continue-on-error: true
+          echo "========================================"
+          echo "Manifest setup completed"
+          echo "========================================"
 
 
-    # ---------------------------------------------------------
-    # INCLUDE RECOVERY INSTALLER
-    # ---------------------------------------------------------
+      # ---------------------------------------------------------
+      # CLONE DEVICE TREE
+      # ---------------------------------------------------------
 
-    - name: Include Recovery Installer
-      run: |
+      - name: Clone Device Tree
+        run: |
+          set -e
 
-        if [ "${{ github.event.inputs.RECOVERY_INSTALLER }}" = "true" ]; then
+          FOX_PATH="${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}"
 
+          echo "========================================"
+          echo "Checking OrangeFox source"
+          echo "========================================"
+
+          if [ ! -d "${FOX_PATH}" ]; then
+            echo "ERROR: OrangeFox source directory does not exist!"
+            echo "${FOX_PATH}"
+            exit 1
+          fi
+
+          cd "${FOX_PATH}"
+
+          echo "Current directory:"
+          pwd
+
+          echo ""
+          echo "Cloning device tree..."
+
+          mkdir -p "$(dirname "${{ inputs.DEVICE_PATH }}")"
+
+          git clone \
+            "${{ inputs.DEVICE_TREE }}" \
+            -b "${{ inputs.DEVICE_TREE_BRANCH }}" \
+            "./${{ inputs.DEVICE_PATH }}"
+
+          cd "${{ inputs.DEVICE_PATH }}"
+
+          COMMIT_ID=$(git rev-parse HEAD)
+
+          echo "Device tree commit: ${COMMIT_ID}"
+
+          echo "COMMIT_ID=${COMMIT_ID}" >> "$GITHUB_ENV"
+
+
+      # ---------------------------------------------------------
+      # BUILD ORANGEFOX
+      # ---------------------------------------------------------
+
+      - name: Building OrangeFox
+        run: |
+          set -e
+
+          FOX_PATH="${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}"
+
+          echo "========================================"
+          echo "Starting OrangeFox build"
+          echo "========================================"
+
+          if [ ! -d "${FOX_PATH}" ]; then
+            echo "ERROR: OrangeFox source directory does not exist!"
+            echo "${FOX_PATH}"
+            exit 1
+          fi
+
+          cd "${FOX_PATH}"
+
+          echo "Build directory:"
+          pwd
+
+          echo ""
+          echo "Loading build environment..."
+
+          source build/envsetup.sh
+
+          export ALLOW_MISSING_DEPENDENCIES=true
+
+          echo ""
+          echo "========================================"
+          echo "Starting build"
+          echo "========================================"
+
+          lunch twrp_${{ inputs.DEVICE_NAME }}-eng
+
+          make clean
+
+          mka adbd ${{ inputs.BUILD_TARGET }}image
+
+          echo "========================================"
+          echo "OrangeFox build finished"
+          echo "========================================"
+
+
+      # ---------------------------------------------------------
+      # SET BUILD DATE
+      # ---------------------------------------------------------
+
+      - name: Set Build Date
+        run: |
+          echo "BUILD_DATE=$(date +%Y%m%d)" >> "$GITHUB_ENV"
+
+
+      # ---------------------------------------------------------
+      # CHECK RECOVERY
+      # ---------------------------------------------------------
+
+      - name: Check if Recovery Exist
+        run: |
+          set -e
+
+          FOX_PATH="${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}"
+
+          PRODUCT_PATH="${FOX_PATH}/out/target/product/${{ inputs.DEVICE_NAME }}"
+
+          echo "========================================"
+          echo "Checking recovery output"
+          echo "========================================"
+
+          echo "Product path:"
+          echo "${PRODUCT_PATH}"
+
+          if compgen -G "${PRODUCT_PATH}/OrangeFox*.img" > /dev/null; then
+
+            echo "OrangeFox image found!"
+
+            echo "CHECK_IMG_IS_OK=true" >> "$GITHUB_ENV"
+            echo "FILE_PATH=${PRODUCT_PATH}" >> "$GITHUB_ENV"
+
+            MD5_IMG=$(md5sum ${PRODUCT_PATH}/OrangeFox*.img | cut -d ' ' -f 1)
+
+            echo "MD5_IMG=${MD5_IMG}" >> "$GITHUB_ENV"
+
+          elif compgen -G "${PRODUCT_PATH}/target/product/${{ inputs.DEVICE_NAME }}/OrangeFox*.img" > /dev/null; then
+
+            echo "OrangeFox image found in nested directory!"
+
+            NESTED_PATH="${PRODUCT_PATH}/target/product/${{ inputs.DEVICE_NAME }}"
+
+            echo "CHECK_IMG_IS_OK=true" >> "$GITHUB_ENV"
+            echo "FILE_PATH=${NESTED_PATH}" >> "$GITHUB_ENV"
+
+            MD5_IMG=$(md5sum ${NESTED_PATH}/OrangeFox*.img | cut -d ' ' -f 1)
+
+            echo "MD5_IMG=${MD5_IMG}" >> "$GITHUB_ENV"
+
+          else
+
+            echo "ERROR: Recovery image was not found."
+
+            echo ""
+            echo "Searching for OrangeFox images..."
+
+            find "${FOX_PATH}/out" \
+              -type f \
+              -name "OrangeFox*.img" \
+              -print || true
+
+            exit 1
+
+          fi
+
+
+      # ---------------------------------------------------------
+      # RENAME RECOVERY
+      # ---------------------------------------------------------
+
+      - name: Rename the Recovery
+        run: |
+          set -e
+
+          cd "${{ env.FILE_PATH }}"
+
+          case "${{ inputs.BUILD_TARGET }}" in
+
+            boot)
+              mv OrangeFox*.img boot.img
+              echo "RECOVERY_TYPE=boot" >> "$GITHUB_ENV"
+              echo "boot.img file found!"
+              ;;
+
+            recovery)
+              mv OrangeFox*.img recovery.img
+              echo "RECOVERY_TYPE=recovery" >> "$GITHUB_ENV"
+              echo "recovery.img file found!"
+              ;;
+
+            vendorboot)
+              mv OrangeFox*.img vendor_boot.img
+              echo "RECOVERY_TYPE=vendor_boot" >> "$GITHUB_ENV"
+              echo "vendor_boot.img file found!"
+              ;;
+
+            *)
+              echo "Invalid build target!"
+              exit 1
+              ;;
+
+          esac
+
+      # ---------------------------------------------------------
+      # INCLUDE RECOVERY INSTALLER
+      # ---------------------------------------------------------
+
+      - name: Include Recovery Installer
+        if: inputs.RECOVERY_INSTALLER == true
+        run: |
           cd "${{ env.FILE_PATH }}/"
 
           wget \
@@ -488,111 +428,96 @@ jobs:
 
           zip -ur recovery-installer.zip "${{ env.RECOVERY_TYPE }}.img"
 
-        fi
 
-      continue-on-error: true
+      # ---------------------------------------------------------
+      # RECOVERY TO TAR
+      # ---------------------------------------------------------
 
-
-    # ---------------------------------------------------------
-    # RECOVERY TO TAR FOR SAMSUNG
-    # ---------------------------------------------------------
-
-    - name: Recovery to tar for Samsung devices
-      run: |
-
-        if [ "${{ github.event.inputs.RECOVERY_TAR }}" = "true" ]; then
-
+      - name: Recovery to tar for Samsung devices
+        if: inputs.RECOVERY_TAR == true
+        run: |
           cd "${{ env.FILE_PATH }}/"
 
           tar -cvf \
             "${{ env.RECOVERY_TYPE }}.tar" \
             "${{ env.RECOVERY_TYPE }}.img"
 
-        fi
 
-      continue-on-error: true
+      # ---------------------------------------------------------
+      # UPLOAD TO RELEASE
+      # ---------------------------------------------------------
 
+      - name: Upload to Release
+        if: env.CHECK_IMG_IS_OK == 'true'
 
-    # ---------------------------------------------------------
-    # UPLOAD TO RELEASE
-    # ---------------------------------------------------------
+        uses: softprops/action-gh-release@v1
 
-    - name: Upload to Release
-      if: env.CHECK_IMG_IS_OK == 'true'
+        with:
+          files: |
+            ${{ env.FILE_PATH }}/${{ env.RECOVERY_TYPE }}.img
+            ${{ env.FILE_PATH }}/${{ env.RECOVERY_TYPE }}.tar
+            ${{ env.FILE_PATH }}/recovery-installer.zip
+            ${{ env.FILE_PATH }}/OrangeFox*.zip
 
-      uses: softprops/action-gh-release@v1
+          name: Unofficial OrangeFox for ${{ inputs.DEVICE_NAME }} // ${{ env.BUILD_DATE }}
 
-      with:
+          tag_name: ${{ github.run_id }}
 
-        files: |
-          ${{ env.FILE_PATH }}/${{ env.RECOVERY_TYPE }}.img
-          ${{ env.FILE_PATH }}/${{ env.RECOVERY_TYPE }}.tar
-          ${{ env.FILE_PATH }}/recovery-installer.zip
-          ${{ env.FILE_PATH }}/OrangeFox*.zip
+          body: |
+            Build: ${{ inputs.MANIFEST_BRANCH }}
 
-        name: Unofficial OrangeFox for ${{ github.event.inputs.DEVICE_NAME }} // ${{ env.BUILD_DATE }}
+            Device: [Device Tree/Branch](${{ inputs.DEVICE_TREE }}/tree/${{ inputs.DEVICE_TREE_BRANCH }})
 
-        tag_name: ${{ github.run_id }}
-
-        body: |
-          Build: ${{ github.event.inputs.MANIFEST_BRANCH }}
-
-          Device: [Device Tree/Branch](${{ github.event.inputs.DEVICE_TREE }}/tree/${{ github.event.inputs.DEVICE_TREE_BRANCH }})
-
-          Commit: Most recent [commit](${{ github.event.inputs.DEVICE_TREE }}/commit/${{ env.COMMIT_ID }})
+            Commit: Most recent [commit](${{ inputs.DEVICE_TREE }}/commit/${{ env.COMMIT_ID }})
 
 
-    # ---------------------------------------------------------
-    # RELEASE RAMDISK RECOVERY
-    # ---------------------------------------------------------
+      # ---------------------------------------------------------
+      # RELEASE RAMDISK RECOVERY
+      # ---------------------------------------------------------
 
-    - name: Release ramdisk-recovery
-      if: env.CHECK_IMG_IS_OK == 'true'
+      - name: Release ramdisk-recovery
+        if: env.CHECK_IMG_IS_OK == 'true'
 
-      uses: softprops/action-gh-release@4634c16e79c963813287e889244c50009e7f0981
+        uses: softprops/action-gh-release@4634c16e79c963813287e889244c50009e7f0981
 
-      with:
+        with:
+          files: |
+            ${{ env.FILE_PATH }}/obj/PACKAGING/vendor_ramdisk_fragments_intermediates/recovery.*
+            ${{ env.FILE_PATH }}/ramdisk-recovery.*
 
-        files: |
-          ${{ env.FILE_PATH }}/obj/PACKAGING/vendor_ramdisk_fragments_intermediates/recovery.*
-          ${{ env.FILE_PATH }}/ramdisk-recovery.*
+          name: Unofficial OrangeFox for ${{ inputs.DEVICE_NAME }} // ${{ env.BUILD_DATE }}
 
-        name: Unofficial OrangeFox for ${{ github.event.inputs.DEVICE_NAME }} // ${{ env.BUILD_DATE }}
+          tag_name: ${{ github.run_id }}
 
-        tag_name: ${{ github.run_id }}
+          body: |
+            Target: ${{ env.RECOVERY_TYPE }}.img
 
-        body: |
-          Target: ${{ env.RECOVERY_TYPE }}.img
+            Build: ${{ inputs.MANIFEST_BRANCH }}
 
-          Build: ${{ github.event.inputs.MANIFEST_BRANCH }}
+            Device: [Device Tree/Branch](${{ inputs.DEVICE_TREE }}/tree/${{ inputs.DEVICE_TREE_BRANCH }})
 
-          Device: [Device Tree/Branch](${{ github.event.inputs.DEVICE_TREE }}/tree/${{ github.event.inputs.DEVICE_TREE_BRANCH }})
+            Commit: Most recent [commit](${{ inputs.DEVICE_TREE }}/commit/${{ env.COMMIT_ID }})
 
-          Commit: Most recent [commit](${{ github.event.inputs.DEVICE_TREE }}/commit/${{ env.COMMIT_ID }})
-
-          MD5 (img): ${{ env.MD5_IMG }}
+            MD5 (img): ${{ env.MD5_IMG }}
 
 
-    # ---------------------------------------------------------
-    # LDCHECK
-    # ---------------------------------------------------------
+      # ---------------------------------------------------------
+      # LDCHECK
+      # ---------------------------------------------------------
 
-    - name: Run LDCheck
-      run: |
+      - name: Run LDCheck
+        if: env.CHECK_IMG_IS_OK == 'true'
+        run: |
+          cd tools
 
-        cd tools
+          mv -n libneeds "${{ env.FILE_PATH }}/recovery/root/" || true
+          mv -n ldcheck "${{ env.FILE_PATH }}/recovery/root/" || true
 
-        mv -n libneeds "${{ env.FILE_PATH }}/recovery/root/"
+          cd "${{ env.FILE_PATH }}/recovery/root/"
 
-        mv -n ldcheck "${{ env.FILE_PATH }}/recovery/root/"
+          python3 ldcheck \
+            -p system/lib64:vendor/lib64:system/lib:vendor/lib \
+            -d "${{ inputs.LDCHECK }}"
 
-        cd "${{ env.FILE_PATH }}/recovery/root/"
-
-        python3 ldcheck \
-          -p system/lib64:vendor/lib64:system/lib:vendor/lib \
-          -d "${{ github.event.inputs.LDCHECK }}"
-
-        echo "Done checking missing dependencies. Review, and reconfigure your tree."
-
-      continue-on-error: true
+          echo "Done checking missing dependencies."
 ```
